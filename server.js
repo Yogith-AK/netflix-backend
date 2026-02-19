@@ -7,25 +7,23 @@ const bcrypt = require("bcrypt");
 
 const app = express();
 
-/* ================= MIDDLEWARE ================= */
+/* ================== MIDDLEWARE ================== */
 
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "*",
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
 
 app.use(express.json());
 
-/* ================= DATABASE CONNECTION ================= */
+/* ================== DATABASE CONNECTION ================== */
 
 const db = mysql.createConnection({
-  host: process.env.MYSQLHOST,
-  user: process.env.MYSQLUSER,
-  password: process.env.MYSQLPASSWORD,
-  database: process.env.MYSQLDATABASE,
-  port: process.env.MYSQLPORT,
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 3306
 });
 
 db.connect((err) => {
@@ -36,13 +34,13 @@ db.connect((err) => {
   }
 });
 
-/* ================= TEST ROUTE ================= */
+/* ================== TEST ROUTE ================== */
 
 app.get("/", (req, res) => {
-  res.send("🚀 Backend is running");
+  res.send("Backend is running 🚀");
 });
 
-/* ================= REGISTER ================= */
+/* ================== REGISTER ================== */
 
 app.post("/register", async (req, res) => {
   const { username, email, password, phone } = req.body;
@@ -54,43 +52,40 @@ app.post("/register", async (req, res) => {
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const sql =
-      "INSERT INTO users (username, email, password, phone) VALUES (?, ?, ?, ?)";
+    const sql = `
+      INSERT INTO users (username, email, password, phone)
+      VALUES (?, ?, ?, ?)
+    `;
 
-    db.query(
-      sql,
-      [username, email, hashedPassword, phone],
-      (err, result) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ message: "Database error" });
-        }
-
-        res.status(201).json({ message: "User registered successfully" });
+    db.query(sql, [username, email, hashedPassword, phone], (err) => {
+      if (err) {
+        console.error("❌ Insert Error:", err);
+        return res.status(500).json({ message: "Database error" });
       }
-    );
+
+      res.status(201).json({ message: "User registered successfully" });
+    });
+
   } catch (error) {
-    console.error(error);
+    console.error("❌ Server Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/* ================= LOGIN ================= */
+/* ================== LOGIN ================== */
 
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res
-      .status(400)
-      .json({ message: "Username and password required" });
+    return res.status(400).json({ message: "Username and password required" });
   }
 
   const sql = "SELECT * FROM users WHERE username = ?";
 
   db.query(sql, [username], async (err, results) => {
     if (err) {
-      console.error(err);
+      console.error("❌ Query Error:", err);
       return res.status(500).json({ message: "Database error" });
     }
 
@@ -100,12 +95,9 @@ app.post("/login", (req, res) => {
 
     const user = results[0];
 
-    const passwordMatch = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const match = await bcrypt.compare(password, user.password);
 
-    if (!passwordMatch) {
+    if (!match) {
       return res.status(401).json({ message: "Invalid password" });
     }
 
@@ -113,7 +105,7 @@ app.post("/login", (req, res) => {
   });
 });
 
-/* ================= SERVER START ================= */
+/* ================== SERVER START ================== */
 
 const PORT = process.env.PORT || 5000;
 
