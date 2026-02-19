@@ -1,40 +1,42 @@
-const cors = require("cors");
-
-const mysql = require("mysql2");
+require("dotenv").config();
 
 const express = require("express");
+const cors = require("cors");
+const mysql = require("mysql2");
+const bcrypt = require("bcrypt");
 
 const app = express();
 
-app.use(cors());
+// ================= MIDDLEWARE =================
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
 
+app.use(express.json());
 
+// ================= DATABASE CONNECTION =================
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "Akyoro$030407",
-  database: "netflix_app"
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
 });
 
 db.connect((err) => {
   if (err) {
-    console.error("Database connection failed:", err);
+    console.error("❌ Database connection failed:", err);
   } else {
-    console.log("MySQL Connected");
+    console.log("✅ MySQL Connected");
   }
 });
 
-
-app.use(express.json());
-
-
-// Basic route
+// ================= TEST ROUTE =================
 app.get("/", (req, res) => {
   res.send("Backend is running");
 });
 
-const bcrypt = require("bcrypt");
-
+// ================= REGISTER =================
 app.post("/register", async (req, res) => {
   const { username, email, password, phone } = req.body;
 
@@ -56,16 +58,16 @@ app.post("/register", async (req, res) => {
         return res.status(500).json({ message: "Database error" });
       }
 
-      res.status(201).json({
-        message: "User registered successfully"
-      });
+      res.status(201).json({ message: "User registered successfully" });
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+// ================= LOGIN =================
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
 
@@ -87,22 +89,24 @@ app.post("/login", (req, res) => {
 
     const user = results[0];
 
-    const bcrypt = require("bcrypt");
-    const match = await bcrypt.compare(password, user.password);
+    try {
+      const match = await bcrypt.compare(password, user.password);
 
-    if (!match) {
-      return res.status(401).json({ message: "Invalid password" });
+      if (!match) {
+        return res.status(401).json({ message: "Invalid password" });
+      }
+
+      res.status(200).json({ message: "Login successful" });
+
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
     }
-
-    res.status(200).json({
-      message: "Login successful"
-    });
   });
 });
 
+// ================= START SERVER =================
+const PORT = process.env.PORT || 5000;
 
-
-// Start server
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
